@@ -28,7 +28,7 @@ jobs:
 
       - name: Lint host scripts
         run: |
-          bash -n host/l2-up.sh host/install.sh
+          for f in host/*.sh; do bash -n "$f"; done
           python3 -m py_compile host/intent.py
 
       - run: bash scripts/bundle.sh

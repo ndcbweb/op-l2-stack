@@ -18,6 +18,8 @@ BATCHER_IMG=$REGISTRY/op-batcher:v1.17.2
 PROPOSER_IMG=$REGISTRY/op-proposer:v1.16.6
 FOUNDRY_IMG=ghcr.io/foundry-rs/foundry:stable
 APP_IMG=node:22-alpine
+# op-service bids at least 1 gwei tip by default, which is far above market on most parent chains.
+MIN_TIP_GWEI=${MIN_TIP_GWEI:-0.01}
 
 install -d -m 0755 "$DATA/deployer" "$DATA/reth" "$DATA/node" "$DATA/status" "$DATA/app"
 
@@ -70,20 +72,7 @@ export DEPLOYER_ADDRESS BATCHER_ADDRESS PROPOSER_ADDRESS SEQUENCER_ADDRESS RELAY
 python3 -c "import json, os; print(json.dumps({k.split('_')[0].lower(): os.environ[k] for k in ('OWNER_ADDRESS', 'DEPLOYER_ADDRESS', 'BATCHER_ADDRESS', 'PROPOSER_ADDRESS', 'SEQUENCER_ADDRESS', 'RELAYER_ADDRESS')}))" > "$DATA/status/addresses.json"
 
 # ---------- 0. bridge site, status API and withdrawal relayer (answers on port 80 from the start) ----------
-if [ -f "$APP_DIR/app/run.sh" ]; then
-  umask 077
-  {
-    for key in L1_RPC_URL L1_PUBLIC_RPC_URL L1_CHAIN_ID L1_NAME L1_EXPLORER_URL NATIVE_SYMBOL NATIVE_NAME \
-      L2_CHAIN_ID CHAIN_NAME L2_PUBLIC_RPC_URL L2_EXPLORER_URL L2_BLOCK_TIME PROPOSAL_INTERVAL RELAYER_KEY; do
-      printf '%s=%s\n' "$key" "${!key:-}"
-    done
-    echo "PORT=80"
-  } > "$APP_DIR/app.env"
-  umask 022
-  run nadcab-l2-app --memory 400m --env-file "$APP_DIR/app.env" \
-    -v "$APP_DIR/app:/app:ro" -v "$DATA/status:/l2/status:ro" -v "$DATA/node:/l2/node:ro" -v "$DATA/app:/data" \
-    "$APP_IMG" sh /app/run.sh
-fi
+bash "$APP_DIR/host/app-up.sh"
 
 # ---------- 1. wait for the owner's funding to land on the one-time deployer ----------
 if [ ! -f "$DATA/deployer/.applied" ]; then
@@ -203,13 +192,15 @@ run nadcab-l2-batcher "$BATCHER_IMG" op-batcher \
   --private-key "$BATCHER_KEY" --data-availability-type "$DA_TYPE" \
   --max-channel-duration "${BATCH_MAX_CHANNEL_DURATION:-25}" --sub-safety-margin 6 \
   --num-confirmations 1 --poll-interval 2s --resubmission-timeout 60s --safe-abort-nonce-too-low-count 3 \
-  --throttle.unsafe-da-bytes-lower-threshold 0 --rpc.addr 127.0.0.1 --rpc.port 9548 --wait-node-sync
+  --throttle.unsafe-da-bytes-lower-threshold 0 --rpc.addr 127.0.0.1 --rpc.port 9548 --wait-node-sync \
+  --txmgr.min-tip-cap "$MIN_TIP_GWEI" --txmgr.min-basefee "$MIN_TIP_GWEI"
 
 PROPOSER_EXTRA=()
 [ "${ALLOW_NON_FINALIZED:-0}" = "1" ] && PROPOSER_EXTRA=(--allow-non-finalized)
 run nadcab-l2-proposer "$PROPOSER_IMG" op-proposer \
   --l1-eth-rpc "$L1_RPC_URL" --superroot-rpcs http://127.0.0.1:9545 \
   --game-factory-address "$DGF" --game-type 5 --proposal-interval "${PROPOSAL_INTERVAL:-1h}" \
-  --private-key "$PROPOSER_KEY" --rpc.addr 127.0.0.1 --rpc.port 9549 --wait-node-sync "${PROPOSER_EXTRA[@]}"
+  --private-key "$PROPOSER_KEY" --rpc.addr 127.0.0.1 --rpc.port 9549 --wait-node-sync \
+  --txmgr.min-tip-cap "$MIN_TIP_GWEI" --txmgr.min-basefee "$MIN_TIP_GWEI" "${PROPOSER_EXTRA[@]}"
 
 status live "L2 chain $L2_CHAIN_ID is running"
