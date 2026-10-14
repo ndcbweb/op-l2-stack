@@ -1,0 +1,54 @@
+name: Build and publish bundle
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: true
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            app/web/package-lock.json
+            app/server/package-lock.json
+
+      - name: Lint host scripts
+        run: |
+          bash -n host/l2-up.sh host/install.sh
+          python3 -m py_compile host/intent.py
+
+      - run: bash scripts/bundle.sh
+
+      - name: App boots before the rollup exists
+        run: |
+          mkdir -p /tmp/l2/status
+          echo '{"stage":"waiting-funds","detail":"test"}' > /tmp/l2/status/status.json
+          cd dist/l2/app/server
+          L1_CHAIN_ID=11155111 L2_CHAIN_ID=424242 PORT=4400 DATA_DIR=/tmp/l2data L2_DIR=/tmp/l2 WEB_DIR=../web \
+            node --experimental-sqlite --no-warnings src/index.js &
+          for i in $(seq 1 20); do curl -fs localhost:4400/api/health && break; sleep 1; done
+          curl -fs localhost:4400/api/config | grep -q '"deployed":false'
+          curl -fs localhost:4400/ | grep -q app.js
+
+      - name: Publish to the "latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view latest >/dev/null 2>&1 || \
+            gh release create latest --title "Latest build" --notes "Rolling build of main."
+          gh release upload latest dist/l2.tar.gz --clobber
+          gh release edit latest --notes "Rolling build of main at ${GITHUB_SHA::7}. l2.tar.gz unpacks into /opt/nadcab/l2 on an L2 host."

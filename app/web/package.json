@@ -1,0 +1,13 @@
+{
+  "name": "nadcab-op-l2-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "viem": "^2.37.0"
+  }
+}

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bridge</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand"><span class="dot"></span><span id="chain-name">Bridge</span></div>
+      <button id="connect" class="btn ghost">Connect wallet</button>
+    </header>
+
+    <main>
+      <div id="banner" class="banner" hidden></div>
+
+      <section class="card">
+        <nav class="tabs">
+          <button data-tab="deposit" class="active">Deposit</button>
+          <button data-tab="withdraw">Withdraw</button>
+          <button data-tab="activity">Withdrawals</button>
+          <button data-tab="network">Network</button>
+        </nav>
+
+        <div data-panel="deposit">
+          <div class="route"><span id="dep-from"></span><span class="arrow">→</span><span id="dep-to"></span></div>
+          <label class="field">
+            <span>Amount</span>
+            <div class="amount"><input id="dep-amount" inputmode="decimal" placeholder="0.0" /><span class="sym"></span></div>
+            <small id="dep-balance" class="muted"></small>
+          </label>
+          <button id="dep-send" class="btn primary wide">Deposit</button>
+          <p class="muted small">Deposits usually arrive on the L2 within a few minutes, once the parent chain block is confirmed.</p>
+        </div>
+
+        <div data-panel="withdraw" hidden>
+          <div class="route"><span id="wd-from"></span><span class="arrow">→</span><span id="wd-to"></span></div>
+          <label class="field">
+            <span>Amount</span>
+            <div class="amount"><input id="wd-amount" inputmode="decimal" placeholder="0.0" /><span class="sym"></span></div>
+            <small id="wd-balance" class="muted"></small>
+          </label>
+          <button id="wd-send" class="btn primary wide">Start withdrawal</button>
+          <p id="wd-note" class="muted small"></p>
+        </div>
+
+        <div data-panel="activity" hidden>
+          <div id="activity" class="list"><p class="muted">Connect a wallet to see its withdrawals.</p></div>
+        </div>
+
+        <div data-panel="network" hidden>
+          <dl id="network" class="facts"></dl>
+          <button id="add-l2" class="btn ghost wide">Add the L2 to my wallet</button>
+        </div>
+      </section>
+
+      <p id="toast" class="toast" hidden></p>
+    </main>
+  </body>
+</html>
