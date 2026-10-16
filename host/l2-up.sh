@@ -98,7 +98,10 @@ if [ ! -f "$DATA/deployer/.applied" ]; then
     fi
     sleep 30
   done
-  [ -f "$DATA/deployer/.applied" ] || fail "The rollup contract deployment failed, see the host log"
+  if [ ! -f "$DATA/deployer/.applied" ]; then
+    tail -n 40 "$DATA/logs/deployer.log" 2>/dev/null || true
+    fail "The rollup contract deployment failed on the parent chain (usually low gas funds, a bad L1 RPC, or a nonce conflict). Fund $DEPLOYER_ADDRESS, check the L1 RPC, delete this deploy if it keeps failing, then launch again."
+  fi
 fi
 
 # ---------- 3. genesis and rollup config ----------
